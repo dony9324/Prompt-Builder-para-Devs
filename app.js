@@ -57,6 +57,7 @@ function addBlock(type, title, content) {
     favorite: false // ⭐ NUEVO
   });
   saveState();
+  renderTaxonomy();
 }
 function toggleFavorite(id) {
   const block = findBlock(id);
@@ -87,6 +88,7 @@ const promptTextarea = document.getElementById("main-prompt");
 promptTextarea.addEventListener("input", () => {
   state.prompt = promptTextarea.value;
   saveState();
+  renderTaxonomy();
 });
 
 
@@ -115,6 +117,7 @@ function updateRelations() {
     });
   });
   saveState();
+  renderTaxonomy();
 }
 
 /* ========= PREDICTIONS ========= */
@@ -308,6 +311,7 @@ document.getElementById("save-combination").onclick = () => {
 
   saveState();
   renderTemplates();
+  renderTaxonomy();
 };
 
 function renderTemplates() {
@@ -334,6 +338,7 @@ function applyTemplate(template) {
   renderBlocks();
   renderPredictions();
   saveState();
+  renderTaxonomy();
 }
 /* Exportar*/
 document.getElementById("export-json").onclick = () => {
@@ -482,6 +487,7 @@ function importState(parsed) {
   state.templates = parsed.templates || [];
   state.selected = new Set(parsed.selected || []);
   saveState();
+  renderTaxonomy();
   renderAll();
 }
 /* Guardar nuevos bloques */
@@ -521,6 +527,7 @@ function updateBlock(id, newType, newTitle, newContent) {
   block.content = newContent;
 
   saveState();
+  renderTaxonomy();
   rebuildPrompt();
   renderBlocks();
   renderPredictions();
@@ -566,6 +573,7 @@ function insertAtCursor(text) {
 
   state.prompt = textarea.value;
   saveState(); // 🔒 persistencia atómica
+  renderTaxonomy();
 }
 
 function deleteBlock(id) {
@@ -589,6 +597,7 @@ function deleteBlock(id) {
   rebuildPrompt();
   renderBlocks();
   renderPredictions();
+  renderTaxonomy();
 }
 const helpModal = document.getElementById("help-modal");
 
@@ -606,4 +615,37 @@ document.addEventListener("keydown", (e) => {
 
 function closeHelpModal() {
   helpModal.classList.add("hidden");
+}
+function getTotalBlocksCount() {
+  return Object.values(state.blocks)
+    .reduce((sum, arr) => sum + arr.length, 0);
+}
+
+function getBlocksCountByType(type) {
+  return (state.blocks[type] || []).length;
+}
+function renderTotalBlocksCount() {
+  document.getElementById("total-blocks-count").innerText =
+    getTotalBlocksCount();
+}
+function renderTaxonomy() {
+  const nav = document.getElementById("taxonomy-nav");
+  nav.innerHTML = "";
+
+  TAXONOMY.forEach(type => {
+    const btn = document.createElement("button");
+    btn.className = "tab-btn" + (type === state.currentType ? " active" : "");
+    btn.innerHTML = `
+      ${type}
+      <span class="count-badge">${getBlocksCountByType(type)}</span>
+    `;
+    btn.onclick = () => {
+      state.currentType = type;
+      renderBlocks();
+      renderTaxonomy();
+    };
+    nav.appendChild(btn);
+  });
+
+  renderTotalBlocksCount();
 }

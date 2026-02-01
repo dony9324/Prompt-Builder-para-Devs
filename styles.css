@@ -391,3 +391,18 @@ textarea {
   font-size: 1.2rem;
   cursor: pointer;
 }
+.count-badge {
+  background: var(--accent, #6cf);
+  color: #000;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.tab-btn .count-badge {
+  margin-left: 6px;
+  background: rgba(255,255,255,0.15);
+  color: inherit;
+}
