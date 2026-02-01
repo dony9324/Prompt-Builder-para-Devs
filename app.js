@@ -60,11 +60,19 @@ function updateSelectedCount() {
     `${state.selected.size} bloque${state.selected.size !== 1 ? 's' : ''}`;
 }
 function renderAll() {
-  renderTaxonomy();
-  renderBlocks();
-  renderPredictions();
-  renderTemplates();
-  document.getElementById("main-prompt").value = state.prompt || "";
+  // Evitar múltiples llamadas al DOM
+  requestAnimationFrame(() => {
+    renderTaxonomy();
+    renderBlocks();
+    renderPredictions();
+    renderTemplates();
+    
+    // Solo actualizar textarea si es diferente
+    const promptTextarea = document.getElementById("main-prompt");
+    if (promptTextarea.value !== state.prompt) {
+      promptTextarea.value = state.prompt || "";
+    }
+  });
 }
 
 /* ========= DEFAULT BLOCKS ========= */
@@ -656,9 +664,33 @@ function getBlocksCountByType(type) {
 }
 
 function showFileModeWarning() {
-  console.warn("Ejecutando en file:// — localStorage depende de la ruta del archivo");
-  alert("Ejecutando en file:// — localStorage depende de la ruta del archivo");
-  // Podrías mostrar un toast o advertencia en la UI
+  if (!state.isFileMode) return;
+  
+  const lastWarning = localStorage.getItem("file_warning_shown");
+  const now = Date.now();
+  
+  // Mostrar solo una vez cada 24 horas
+  if (!lastWarning || (now - parseInt(lastWarning)) > 24 * 60 * 60 * 1000) {
+    console.warn("Ejecutando en file:// — localStorage depende de la ruta");
+    
+    // Crear toast no intrusivo
+    const toast = document.createElement("div");
+    toast.className = "toast warning";
+    toast.innerHTML = `
+      ⚠️ Modo archivo local detectado. 
+      <small>Usa un servidor local o guarda backups frecuentes.</small>
+      <button onclick="this.parentElement.remove()">✕</button>
+    `;
+    document.body.appendChild(toast);
+    
+    localStorage.setItem("file_warning_shown", now.toString());
+    
+    setTimeout(() => {
+      if (toast.parentElement) {
+        toast.remove();
+      }
+    }, 8000);
+  }
 }
 
 /* ========= PERSISTENCIA ========= */
@@ -851,21 +883,43 @@ function setupEventListeners() {
   });
 
   // Copiar al portapapeles
-  document.getElementById("copy-btn").onclick = () => {
-    const textarea = document.getElementById("main-prompt");
-    textarea.select();
-    document.execCommand("copy");
+document.getElementById("copy-btn").onclick = async () => {
+  const textarea = document.getElementById("main-prompt");
+  const text = textarea.value;
+  
+  if (!text.trim()) {
+    alert("No hay contenido para copiar");
+    return;
+  }
+  
+  try {
+    await navigator.clipboard.writeText(text);
     
-    // Feedback visual
-    const originalText = textarea.value;
     const btn = document.getElementById("copy-btn");
-    const originalBtnText = btn.innerText;
+    const originalText = btn.innerText;
     btn.innerText = "✓ Copiado!";
-    btn.style.backgroundColor = "#4CAF50";
+    btn.classList.add("copied");
     
     setTimeout(() => {
-      btn.innerText = originalBtnText;
-      btn.style.backgroundColor = "";
+      btn.innerText = originalText;
+      btn.classList.remove("copied");
     }, 2000);
-  };
+  } catch (err) {
+    // Fallback para navegadores antiguos
+    textarea.select();
+    document.execCommand("copy");
+    alert("Texto copiado (método alternativo)");
+  }
+};
+}
+
+function validateGitHubToken(token) {
+  // Validación básica del formato del token
+  if (!token || token.trim().length < 20) {
+    return "Token demasiado corto";
+  }
+  if (!token.startsWith("ghp_") && !token.startsWith("github_pat_")) {
+    return "Formato de token inválido";
+  }
+  return null; // Token válido
 }
