@@ -15,6 +15,10 @@ const TAXONOMY = [
   "Contexto"
 ];
 
+const CONFIRMATION_TEXTS = {
+  reset1: "SI",
+  reset2: "YES"
+};
 const GIST_API = "https://api.github.com/gists";
 
 /* ========= STATE ========= */
@@ -40,11 +44,21 @@ function init() {
   loadState();
   seedDefaults();
   renderAll();
+
+  // Restaurar prompt del estado
+  if (state.prompt) {
+    document.getElementById("main-prompt").value = state.prompt;
+    updateSelectedCount();
+  }
+
   if (state.isFileMode) {
     showFileModeWarning();
   }
 }
-
+function updateSelectedCount() {
+  document.getElementById("selected-count").innerText = 
+    `${state.selected.size} bloque${state.selected.size !== 1 ? 's' : ''}`;
+}
 function renderAll() {
   renderTaxonomy();
   renderBlocks();
@@ -269,7 +283,12 @@ function renderBlocks() {
 
   filtered.forEach(b => {
     const div = document.createElement("div");
-    div.className = "block-card" + (state.selected.has(b.id) ? " selected" : "");
+    div.className = "block-card";
+    
+    // Añadir clase "selected" si el bloque está en el Set
+    if (state.selected.has(b.id)) {
+      div.classList.add("selected");
+    }
     
     div.innerHTML = `
       <div class="block-header">
@@ -279,14 +298,24 @@ function renderBlocks() {
       <p>${b.content}</p>
     `;
 
-    div.onclick = () => toggleBlock(b.id);
+    // Click izquierdo: seleccionar/deseleccionar
+    div.onclick = (e) => {
+      if (e.button === 0) { // Solo click izquierdo
+        toggleBlock(b.id);
+      }
+    };
+    
+    // Click en favorito
     div.querySelector(".fav").onclick = (e) => {
       e.stopPropagation();
       toggleFavorite(b.id);
     };
     
+    // Click derecho: editar/eliminar
     div.oncontextmenu = (e) => {
       e.preventDefault();
+      e.stopPropagation();
+      
       if (e.shiftKey) {
         deleteBlock(b.id);
       } else {
@@ -349,20 +378,21 @@ function applyTemplate(template) {
 
 /* ========= GESTIÓN GITHUB GIST ========= */
 function getGitHubToken() {
-  let token = localStorage.getItem("github_token");
+  return localStorage.getItem("github_token");
+}
+function requestGitHubToken() {
+  const token = prompt(
+    "Introduce tu GitHub Personal Access Token (scope: gist):\n" +
+    "Se guardará solo en este navegador.\n\n" +
+    "Puedes crear uno en: https://github.com/settings/tokens/new\n" +
+    "(selecciona solo el scope 'gist')"
+  );
   
-  if (!token) {
-    token = prompt(
-      "Introduce tu GitHub Personal Access Token (scope: gist):\n" +
-      "Se guardará solo en este navegador."
-    );
-    
-    if (!token) return null;
-    
-    localStorage.setItem("github_token", token.trim());
-  }
+  if (!token) return null;
   
-  return token;
+  const trimmedToken = token.trim();
+  localStorage.setItem("github_token", trimmedToken);
+  return trimmedToken;
 }
 
 function getAuthHeaders() {
@@ -378,12 +408,15 @@ function getAuthHeaders() {
 
 async function saveToGist() {
   try {
-    const token = getGitHubToken();
-    if (!token) return;
+    let token = getGitHubToken();
+    if (!token) {
+      token = requestGitHubToken();
+      if (!token) return;
+    }
 
     const gistId = localStorage.getItem("gist_id");
     const payload = {
-      description: "Prompt Builder Backup - " + new Date().toLocaleString(),
+      description: `Prompt Builder Backup - ${new Date().toLocaleString()}`,
       public: false,
       files: {
         "prompt-builder.json": {
@@ -397,11 +430,21 @@ async function saveToGist() {
 
     const response = await fetch(url, {
       method,
-      headers: getAuthHeaders(),
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Accept": "application/vnd.github+json",
+        "Content-Type": "application/json"
+      },
       body: JSON.stringify(payload)
     });
 
     if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        // Token inválido, pedir nuevo
+        localStorage.removeItem("github_token");
+        alert("Token inválido o expirado. Por favor, ingrésalo nuevamente.");
+        return saveToGist(); // Recursión para pedir nuevo token
+      }
       throw new Error(`Error ${response.status}: ${response.statusText}`);
     }
 
@@ -409,36 +452,57 @@ async function saveToGist() {
     
     if (!gistId) {
       localStorage.setItem("gist_id", data.id);
-      localStorage.setItem("gist_url", data.html_url);
     }
+    localStorage.setItem("gist_url", data.html_url);
 
-    alert(`Backup guardado en Gist ✅\nURL: ${data.html_url}`);
+    alert(`✅ Backup guardado en Gist\n${data.html_url}`);
   } catch (error) {
-    alert(`Error al guardar en Gist: ${error.message}`);
+    alert(`❌ Error al guardar en Gist: ${error.message}`);
   }
 }
 
 async function loadFromGist() {
   try {
-    const token = getGitHubToken();
-    if (!token) return;
-
-    const gistId = localStorage.getItem("gist_id");
-    let targetGistId = gistId;
-
-    if (!targetGistId) {
-      targetGistId = prompt(
-        "Introduce el ID del Gist a restaurar:\n" +
-        "(Lo encuentras en la URL del Gist: gist.github.com/USER/ID)"
-      );
-      if (!targetGistId) return;
+    let token = getGitHubToken();
+    if (!token) {
+      token = requestGitHubToken();
+      if (!token) return;
     }
 
-    const response = await fetch(`${GIST_API}/${targetGistId}`, {
-      headers: getAuthHeaders()
+    let gistId = localStorage.getItem("gist_id");
+    
+    // Si no hay gist_id guardado, pedirlo
+    if (!gistId) {
+      const input = prompt(
+        "Introduce el ID del Gist a restaurar:\n" +
+        "(Lo encuentras en la URL: gist.github.com/tu-usuario/ID)\n\n" +
+        "Deja vacío para listar tus gists recientes."
+      );
+      
+      if (input === null) return; // Usuario canceló
+      
+      if (input.trim() === "") {
+        // Listar gists del usuario
+        await listUserGists(token);
+        return;
+      }
+      
+      gistId = input.trim();
+    }
+
+    const response = await fetch(`${GIST_API}/${gistId}`, {
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Accept": "application/vnd.github+json"
+      }
     });
 
     if (!response.ok) {
+      if (response.status === 404) {
+        alert("Gist no encontrado. Verifica el ID.");
+        localStorage.removeItem("gist_id");
+        return loadFromGist(); // Intentar de nuevo
+      }
       throw new Error(`Error ${response.status}: ${response.statusText}`);
     }
 
@@ -446,20 +510,59 @@ async function loadFromGist() {
     const file = data.files["prompt-builder.json"];
     
     if (!file) {
-      throw new Error("No se encontró el archivo prompt-builder.json en el Gist");
+      throw new Error("El Gist no contiene datos de Prompt Builder");
     }
 
     const parsed = JSON.parse(file.content);
     importState(parsed);
     
-    if (targetGistId !== gistId) {
-      localStorage.setItem("gist_id", targetGistId);
-      localStorage.setItem("gist_url", data.html_url);
+    // Guardar el ID del gist para futuras restauraciones
+    localStorage.setItem("gist_id", gistId);
+    localStorage.setItem("gist_url", data.html_url);
+
+    alert("✅ Configuración restaurada desde Gist");
+  } catch (error) {
+    alert(`❌ Error al cargar desde Gist: ${error.message}`);
+  }
+}
+// Nueva función para listar gists del usuario
+async function listUserGists(token) {
+  try {
+    const response = await fetch(`${GIST_API}?per_page=10`, {
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Accept": "application/vnd.github+json"
+      }
+    });
+
+    if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`);
+
+    const gists = await response.json();
+    
+    if (gists.length === 0) {
+      alert("No tienes Gists guardados.");
+      return;
     }
 
-    alert("Configuración restaurada desde Gist ✅");
+    let message = "Tus Gists recientes:\n\n";
+    gists.forEach((gist, index) => {
+      const desc = gist.description || "Sin descripción";
+      const date = new Date(gist.created_at).toLocaleDateString();
+      message += `${index + 1}. ${desc} (${date})\n`;
+      message += `   ID: ${gist.id}\n`;
+      message += `   URL: ${gist.html_url}\n\n`;
+    });
+    
+    message += "Copia el ID del Gist que quieras restaurar.";
+    alert(message);
+    
+    const gistId = prompt("Pega el ID del Gist que quieres restaurar:");
+    if (gistId) {
+      localStorage.setItem("gist_id", gistId.trim());
+      await loadFromGist(); // Cargar el gist específico
+    }
   } catch (error) {
-    alert(`Error al cargar desde Gist: ${error.message}`);
+    alert(`❌ Error al listar Gists: ${error.message}`);
   }
 }
 
@@ -477,6 +580,45 @@ function exportState() {
       totalBlocks: getTotalBlocksCount()
     }
   };
+}
+/* ========= RESET CONFIRMADO POR TEXTO ========= */
+function resetApp() {
+  const respuesta = prompt(
+    "⚠️ RESET TOTAL DE LA APLICACIÓN ⚠️\n\n" +
+    "Esto borrará TODOS los datos locales:\n" +
+    "- Bloques personalizados\n" +
+    "- Plantillas guardadas\n" +
+    "- Historial de relaciones\n" +
+    "- Configuraciones\n\n" +
+    "Para confirmar, escribe 'SI' (en mayúsculas):"
+  );
+
+  if (respuesta === "SI") {
+    const confirmacionFinal = prompt(
+      "ÚLTIMA CONFIRMACIÓN:\n" +
+      "Escribe 'YES' para borrar todo irreversiblemente:"
+    );
+
+    if (confirmacionFinal === "YES") {
+      // Limpiar todo el localStorage
+      localStorage.removeItem("prompt-builder");
+      localStorage.removeItem("github_token");
+      localStorage.removeItem("gist_id");
+      localStorage.removeItem("gist_url");
+      
+      // Mostrar mensaje de éxito
+      alert("✅ Aplicación reseteada. Recargando...");
+      
+      // Recargar después de un breve delay
+      setTimeout(() => {
+        location.reload();
+      }, 1000);
+    } else {
+      alert("❌ Reset cancelado. Los datos están seguros.");
+    }
+  } else {
+    alert("❌ Reset cancelado.");
+  }
 }
 
 function importState(parsed) {
@@ -515,6 +657,7 @@ function getBlocksCountByType(type) {
 
 function showFileModeWarning() {
   console.warn("Ejecutando en file:// — localStorage depende de la ruta del archivo");
+  alert("Ejecutando en file:// — localStorage depende de la ruta del archivo");
   // Podrías mostrar un toast o advertencia en la UI
 }
 
@@ -530,32 +673,38 @@ function saveState() {
 
 function loadState() {
   const saved = localStorage.getItem("prompt-builder");
-  if (!saved) return;
+   if (!saved) {
+    console.log("No hay estado guardado, iniciando con valores por defecto");
+    return;
+  }
 
-  try {
+   try {
     const parsed = JSON.parse(saved);
     
-    // Restaurar estado con normalización
+    // Restaurar todo el estado
     state.blocks = parsed.blocks || {};
     state.relations = parsed.relations || {};
     state.templates = parsed.templates || [];
     state.prompt = parsed.prompt || "";
     state.currentType = parsed.currentType || TAXONOMY[0];
+    state.searchQuery = "";
+    state.editingBlockId = null;
     
-    // Manejo seguro del Set selected
+    // Restaurar selección (Set)
     if (Array.isArray(parsed.selected)) {
-      state.selected = new Set(parsed.selected);
+      state.selected = new Set(parsed.selected.filter(id => {
+        // Verificar que el bloque aún existe
+        return findBlock(id) !== null;
+      }));
     } else {
       state.selected = new Set();
     }
     
-    // Migración de datos antiguos
-    if (parsed.version === 1) {
-      // Convertir arrays a Sets si es necesario
-    }
+    console.log(`Estado cargado: ${Object.keys(state.blocks).length} categorías, ${getTotalBlocksCount()} bloques, ${state.selected.size} seleccionados`);
+    
   } catch (error) {
-    console.error("Error loading state:", error);
-    // Estado por defecto
+    console.error("Error cargando estado:", error);
+    // En caso de error, empezar de cero pero mantener el localStorage por si acaso
   }
 }
 
@@ -680,12 +829,8 @@ function setupEventListeners() {
     renderAll();
   };
 
-  document.getElementById("reset-app").onclick = () => {
-    if (confirm("¿Estás seguro? Esto borrará TODOS los datos locales.")) {
-      localStorage.clear();
-      location.reload();
-    }
-  };
+// Reset App
+  document.getElementById("reset-app").onclick = resetApp;
 
   // Modal de ayuda
   const helpModal = document.getElementById("help-modal");
