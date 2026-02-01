@@ -10,6 +10,7 @@
     <header class="main-header">
         <h1><span>Prompt</span>Builder <span></span></h1>
         <div class="header-actions">
+            <button id="open-help" class="btn btn-outline">❓ Instrucciones</button>
             <button id="gist-save" class="btn btn-outline">☁ Guardar en Gist</button>
             <button id="gist-load" class="btn btn-outline">⬇ Restaurar</button>
             <button id="export-json" class="btn btn-outline">⬇ Exportar</button>
@@ -114,6 +115,58 @@
             </div>
         </aside>
     </main>
+<div id="help-modal" class="modal hidden">
+  <div class="modal-overlay"></div>
+
+  <div class="modal-content">
+    <button class="modal-close" id="close-help">✕</button>
+
+    <h2>📘 Instrucciones de uso</h2>
+
+    <section>
+      <h3>🧱 Bloques</h3>
+      <ul>
+        <li>Click izquierdo: insertar el bloque en el cursor</li>
+        <li>Click derecho: editar bloque</li>
+        <li>Shift + click derecho: eliminar bloque</li>
+        <li>⭐ Marca favoritos para acceso rápido</li>
+      </ul>
+    </section>
+
+    <section>
+      <h3>✏️ Editor</h3>
+      <ul>
+        <li>El texto se guarda automáticamente</li>
+        <li>La inserción respeta la posición del cursor</li>
+        <li>Puedes escribir libremente y mezclar bloques</li>
+      </ul>
+    </section>
+
+    <section>
+      <h3>🔮 Sugerencias</h3>
+      <p>
+        Las sugerencias se basan en combinaciones previas de bloques.
+        No se usa IA externa.
+      </p>
+    </section>
+
+    <section>
+      <h3>💾 Plantillas</h3>
+      <ul>
+        <li>Guarda combinaciones frecuentes</li>
+        <li>Recupéralas con un solo click</li>
+      </ul>
+    </section>
+
+    <section>
+      <h3>☁️ Backup</h3>
+      <p>
+        Puedes exportar / importar JSON o guardar todo en un GitHub Gist.
+        El token se guarda solo en tu navegador.
+      </p>
+    </section>
+  </div>
+</div>
 
     <script src="app.js"></script>
 </body>

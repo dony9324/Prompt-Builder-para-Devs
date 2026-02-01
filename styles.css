@@ -331,3 +331,63 @@ textarea {
 .fav.active {
   color: gold;
 }
+
+
+/* ===== MODAL ===== */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.modal-content {
+  position: relative;
+  max-width: 700px;
+  max-height: 80vh;
+  margin: 5vh auto;
+  background: var(--bg-panel, #111);
+  color: var(--text-main, #fff);
+  border-radius: 12px;
+  padding: 24px;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,.4);
+}
+
+.modal-content h2 {
+  margin-top: 0;
+}
+
+.modal-content section {
+  margin-bottom: 20px;
+}
+
+.modal-content ul {
+  padding-left: 20px;
+}
+
+.modal-content li {
+  margin-bottom: 6px;
+  font-size: 0.9rem;
+  color: var(--text-dim, #bbb);
+}
+
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 1.2rem;
+  cursor: pointer;
+}

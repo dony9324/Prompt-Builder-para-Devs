@@ -590,3 +590,20 @@ function deleteBlock(id) {
   renderBlocks();
   renderPredictions();
 }
+const helpModal = document.getElementById("help-modal");
+
+document.getElementById("open-help").onclick = () => {
+  helpModal.classList.remove("hidden");
+};
+
+document.getElementById("close-help").onclick = closeHelpModal;
+
+helpModal.querySelector(".modal-overlay").onclick = closeHelpModal;
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeHelpModal();
+});
+
+function closeHelpModal() {
+  helpModal.classList.add("hidden");
+}
