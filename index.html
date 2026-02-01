@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prompt Builder for Devs | MVP</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="main-header">
+        <h1><span>Prompt</span>Builder <span></span></h1>
+        <div class="header-actions">
+            <button id="gist-save" class="btn btn-outline">☁ Guardar en Gist</button>
+            <button id="gist-load" class="btn btn-outline">⬇ Restaurar</button>
+            <button id="export-json" class="btn btn-outline">⬇ Exportar</button>
+            <button id="import-json" class="btn btn-outline">⬆ Importar</button>
+            <input type="file" id="import-file" accept="application/json" hidden />
+            <button id="save-combination" class="btn btn-accent">💾 Guardar Combinación y Entrenar</button>
+            <button id="clear-all" class="btn btn-danger">Limpiar Todo</button>
+            <button id="reset-app" class="btn btn-outline">Reset</button>
+        </div>
+    </header>
+
+    <main class="app-container">
+        <aside class="sidebar">
+            <input
+  type="text"
+  id="block-search"
+  placeholder="Buscar bloques..."
+  class="block-search"
+/>
+            <h2>Librería de Bloques</h2>
+             <div id="taxonomy-nav" class="tabs">
+       
+    </div>
+            <div id="blocks-grid" class="blocks-grid">
+                <div class="block-card" onclick="toggleBlock('b1')">
+            <strong>Senior Architect</strong>
+            <p style="font-size: 0.7rem; color: var(--text-dim); margin-top:5px">
+                Actúa como un arquitecto frontend senior...
+            </p>
+        </div>
+                </div>
+            
+        </aside>
+
+        <section class="editor-section">
+            <div class="section-header">
+                <h2>Prompt Final</h2>
+                <span id="selected-count" class="badge">0 bloques</span>
+                <div class="actions">
+                    <button id="ai-clean-btn" class="btn btn-ai">✨ Limpiar y Reestructurar</button>
+                    <button id="copy-btn" class="btn btn-secondary">Copiar al portapapeles</button>
+                </div>
+            </div>
+            <textarea id="main-prompt" placeholder="Construye tu prompt haciendo click en los bloques o escribe aquí..."></textarea>
+        </section>
+<aside class="right-column">
+       
+        <aside class="templates-panel">
+            <div class="panel-section">
+                <h3>📚 Plantillas</h3>
+                <div id="templates-list" class="template-list">
+                    <p class="tip">Aún no hay plantillas guardadas.</p>
+                </div>
+            </div>
+        </aside>
+        <aside class="side-panel">
+            <div class="panel-section">
+                <h3>🔮 Sugerencias</h3>
+                <div id="predictions" class="prediction-stack"><p class="tip">Usa bloques para generar predicciones.</p></div>
+            </div>
+            <div class="panel-section">
+                <h3>📊 Contexto</h3>
+                <div id="active-tags" class="tag-cloud"></div>
+            </div>
+        </aside>
+        </aside>
+
+        <aside class="ai-tools">
+            <div class="tool-card">
+                <h3>Descomposición de Código</h3>
+                <p class="tool-desc">Pega una clase o entidad para extraer lógica.</p>
+                <textarea id="code-input" placeholder="Pega tu código aquí..."></textarea>
+                <button id="deconstruct-btn" class="btn btn-primary">Descomponer Código</button>
+                <div class="result-area">
+                    <label>Resultado:</label>
+                    <textarea id="code-output" readonly></textarea>
+                    <button id="insert-analysis-btn" class="btn btn-small">Insertar en Prompt</button>
+                </div>
+            </div>
+
+            <div class="add-custom-block">
+                <h3>+ Nuevo Bloque</h3>
+                <select id="new-block-group">
+                    <option value="Rol / Perfil">Rol / Perfil</option>
+                    <option value="Objetivo / Tarea">Objetivo / Tarea</option>
+                    <option value="Alcance funcional">Alcance funcional</option>
+                    <option value="Plataforma / Stack">Plataforma / Stack</option>
+                    <option value="Lenguaje">Lenguaje</option>
+                    <option value="Componentes">Componentes</option>
+                    <option value="UI / Layout">UI / Layout</option>
+                    <option value="Arquitectura">Arquitectura</option>
+                    <option value="Estilo visual">Estilo visual</option>
+                    <option value="Restricciones">Restricciones</option>
+                    <option value="Output">Output</option>
+                    <option value="Complejidad">Complejidad</option>
+                    <option value="Contexto">Contexto</option>
+                </select>
+
+                <input type="text" id="new-block-title" placeholder="Título...">
+                <textarea id="new-block-content" placeholder="Contenido del bloque..."></textarea>
+                <button id="add-block-btn" class="btn btn-primary">Guardar Bloque</button>
+            </div>
+        </aside>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>

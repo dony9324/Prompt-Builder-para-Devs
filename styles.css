@@ -1,0 +1,333 @@
+:root {
+  --bg: #0f1115;
+  --panel: #171a21;
+  --panel-light: #1f2430;
+  --border: #2a2f3a;
+  --text: #e6e6eb;
+  --text-dim: #9aa0aa;
+
+  --accent: #6cf2c2;
+  --danger: #ff6b6b;
+  --primary: #5c9cff;
+  --secondary: #8a8f98;
+  --ai: #c77dff;
+
+  --radius: 10px;
+  --radius-sm: 6px;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden; /* 🔑 evita scroll global */
+}
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== HEADER ===== */
+.main-header {
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.main-header h1 {
+  font-size: 1.3rem;
+}
+
+.main-header span {
+  color: var(--accent);
+}
+
+.header-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* ===== LAYOUT ===== */
+.app-container {
+  display: grid;
+  grid-template-columns: 280px 1fr 300px 260px;
+  gap: 1rem;
+  padding: 1rem;
+  height: 100%; /* ← en lugar de calc(100vh - 70px) */
+}
+
+/* ===== SIDEBAR ===== */
+.sidebar {
+  background: var(--panel);
+  border-radius: var(--radius);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar h2 {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+.block-search {
+  margin-bottom: 0.5rem;
+  font-size: 0.75rem;
+}
+/* ===== TABS ===== */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 0.5rem;
+}
+
+.tab-btn {
+  background: var(--panel-light);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 0.65rem;
+  padding: 0.3rem 0.45rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.tab-btn.active {
+  background: var(--primary);
+  color: #fff;
+}
+
+/* ===== BLOCK GRID ===== */
+.blocks-grid {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+}
+
+.block-card {
+  background: var(--panel-light);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem;
+  cursor: pointer;
+}
+
+.block-card:hover {
+  border-color: var(--accent);
+}
+
+.block-card.selected {
+  outline: 2px solid var(--accent);
+}
+
+/* ===== ADD BLOCK ===== */
+.add-custom-block {
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.5rem;
+}
+
+.add-custom-block h3 {
+  font-size: 0.85rem;
+  margin-bottom: 0.3rem;
+}
+
+select,
+input,
+textarea {
+  width: 100%;
+  margin-bottom: 0.4rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 0.4rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+}
+
+/* ===== EDITOR ===== */
+.editor-section {
+  background: var(--panel);
+  border-radius: var(--radius);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.section-header h2 {
+  font-size: 1rem;
+}
+
+.badge {
+  background: var(--panel-light);
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.7rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+#main-prompt {
+  flex: 1;
+  margin-top: 0.5rem;
+  resize: none;
+}
+
+/* ===== AI TOOLS ===== */
+.ai-tools,
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.tool-card,
+.panel-section {
+  background: var(--panel);
+  border-radius: var(--radius);
+  padding: 0.8rem;
+}
+
+.tool-desc {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.result-area textarea {
+  height: 80px;
+}
+
+/* ===== PREDICTIONS ===== */
+.prediction-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.prediction-item {
+  background: var(--panel-light);
+  border: 1px dashed var(--border);
+  padding: 0.4rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.prediction-item:hover {
+  border-color: var(--accent);
+}
+
+/* ===== TAG CLOUD ===== */
+.tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.tag {
+  background: var(--panel-light);
+  padding: 0.2rem 0.4rem;
+  font-size: 0.65rem;
+  border-radius: var(--radius-sm);
+}
+.block-card p {
+  font-size: 0.65rem;   /* más pequeño */
+  line-height: 1.3;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+.block-card strong {
+  font-size: 0.75rem;
+}
+/* ===== BUTTONS ===== */
+.btn {
+  border: none;
+  cursor: pointer;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
+}
+
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-secondary { background: var(--secondary); color: #fff; }
+.btn-accent { background: var(--accent); color: #000; }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.btn-ai { background: var(--ai); color: #000; }
+.btn-small { font-size: 0.65rem; }
+/**/
+.templates-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.template-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.template-item {
+  background: var(--panel-light);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.template-item:hover {
+  border-color: var(--primary);
+}
+
+.right-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow: hidden;
+}
+
+.right-column > aside {
+  overflow-y: auto;
+}
+/* Favoritos  */
+.block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.fav {
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+.fav.active {
+  color: gold;
+}
