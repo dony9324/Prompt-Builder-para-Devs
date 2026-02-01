@@ -1,17 +1,4 @@
-/* ========= STATE ========= */
-const state = {
-  blocks: {},
-  selected: new Set(),
-  prompt: "",
-  relations: {},
-  history: [],
-  templates: [], 
-  currentType: "Rol / Perfil",
-  searchQuery: "",
-  editingBlockId: null
-};
-
-/* ========= TAXONOMY ========= */
+/* ========= CONSTANTES ========= */
 const TAXONOMY = [
   "Rol / Perfil",
   "Objetivo / Tarea",
@@ -28,25 +15,57 @@ const TAXONOMY = [
   "Contexto"
 ];
 
+const GIST_API = "https://api.github.com/gists";
+
+/* ========= STATE ========= */
+const state = {
+  blocks: {},
+  selected: new Set(),
+  prompt: "",
+  relations: {},
+  templates: [],
+  currentType: TAXONOMY[0],
+  searchQuery: "",
+  editingBlockId: null,
+  isFileMode: location.protocol === "file:"
+};
+
 /* ========= INIT ========= */
-init();
+document.addEventListener('DOMContentLoaded', () => {
+  init();
+  setupEventListeners();
+});
 
 function init() {
   loadState();
   seedDefaults();
+  renderAll();
+  if (state.isFileMode) {
+    showFileModeWarning();
+  }
+}
+
+function renderAll() {
   renderTaxonomy();
   renderBlocks();
   renderPredictions();
-  renderTemplates()
+  renderTemplates();
   document.getElementById("main-prompt").value = state.prompt || "";
 }
 
 /* ========= DEFAULT BLOCKS ========= */
 function seedDefaults() {
-  if (Object.keys(state.blocks).length) return;
+  if (Object.keys(state.blocks).length > 0) return;
+  
+  // Bloques por defecto para empezar
+  /*
+  addBlock("Rol / Perfil", "Senior Architect", 
+    "Actúa como un arquitecto frontend senior con 10+ años de experiencia en sistemas escalables.");
+  addBlock("Output", "Código bien documentado", 
+    "Proporciona código limpio, bien documentado con comentarios explicativos.");*/
 }
 
-/* ========= BLOCK MGMT ========= */
+/* ========= GESTIÓN DE BLOQUES ========= */
 function addBlock(type, title, content) {
   if (!state.blocks[type]) state.blocks[type] = [];
   state.blocks[type].push({
@@ -54,18 +73,51 @@ function addBlock(type, title, content) {
     type,
     title,
     content,
-    favorite: false // ⭐ NUEVO
+    favorite: false
   });
   saveState();
   renderTaxonomy();
+  renderBlocks();
 }
-function toggleFavorite(id) {
+
+function updateBlock(id, newType, newTitle, newContent) {
   const block = findBlock(id);
   if (!block) return;
 
-  block.favorite = !block.favorite;
+  // Mover a nueva categoría si es necesario
+  if (block.type !== newType) {
+    state.blocks[block.type] = state.blocks[block.type].filter(b => b.id !== id);
+    if (!state.blocks[newType]) state.blocks[newType] = [];
+    block.type = newType;
+    state.blocks[newType].push(block);
+  }
+
+  block.title = newTitle;
+  block.content = newContent;
+
   saveState();
-  renderBlocks();
+  renderAll();
+}
+
+function deleteBlock(id) {
+  const block = findBlock(id);
+  if (!block) return;
+
+  if (!confirm(`¿Eliminar el bloque "${block.title}"?`)) return;
+
+  // Eliminar de categoría
+  state.blocks[block.type] = state.blocks[block.type].filter(b => b.id !== id);
+  
+  // Limpiar selección
+  state.selected.delete(id);
+  
+  // Limpiar relaciones
+  delete state.relations[id];
+  Object.values(state.relations).forEach(rel => delete rel[id]);
+
+  saveState();
+  rebuildPrompt();
+  renderAll();
 }
 
 function toggleBlock(id) {
@@ -83,16 +135,16 @@ function toggleBlock(id) {
   renderBlocks();
   renderPredictions();
 }
-const promptTextarea = document.getElementById("main-prompt");
 
-promptTextarea.addEventListener("input", () => {
-  state.prompt = promptTextarea.value;
+function toggleFavorite(id) {
+  const block = findBlock(id);
+  if (!block) return;
+  block.favorite = !block.favorite;
   saveState();
-  renderTaxonomy();
-});
+  renderBlocks();
+}
 
-
-/* ========= PROMPT ========= */
+/* ========= EDITOR Y PROMPT ========= */
 function rebuildPrompt() {
   let text = "";
   state.selected.forEach(id => {
@@ -101,11 +153,29 @@ function rebuildPrompt() {
   });
   state.prompt = text.trim();
   document.getElementById("main-prompt").value = state.prompt;
-  document.getElementById("selected-count").innerText =
-    `${state.selected.size} bloques`;
+  document.getElementById("selected-count").innerText = `${state.selected.size} bloques`;
 }
 
-/* ========= RELATIONS ========= */
+function insertAtCursor(text) {
+  const textarea = document.getElementById("main-prompt");
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+
+  const before = textarea.value.substring(0, start);
+  const after = textarea.value.substring(end);
+
+  const insertion = text.endsWith("\n") ? text : text + "\n\n";
+  textarea.value = before + insertion + after;
+
+  const newCursorPos = before.length + insertion.length;
+  textarea.selectionStart = textarea.selectionEnd = newCursorPos;
+
+  state.prompt = textarea.value;
+  saveState();
+  renderTaxonomy();
+}
+
+/* ========= RELACIONES Y PREDICCIONES ========= */
 function updateRelations() {
   const ids = [...state.selected];
   ids.forEach(a => {
@@ -117,10 +187,8 @@ function updateRelations() {
     });
   });
   saveState();
-  renderTaxonomy();
 }
 
-/* ========= PREDICTIONS ========= */
 function renderPredictions() {
   const container = document.getElementById("predictions");
   container.innerHTML = "";
@@ -155,479 +223,7 @@ function renderPredictions() {
   });
 }
 
-/* ========= RENDER ========= */
-function renderTaxonomy() {
-  const nav = document.getElementById("taxonomy-nav");
-  nav.innerHTML = "";
-  TAXONOMY.forEach(type => {
-    const btn = document.createElement("button");
-    btn.className = "tab-btn" + (type === state.currentType ? " active" : "");
-    btn.innerText = type;
-    btn.onclick = () => {
-      state.currentType = type;
-      renderBlocks();
-      renderTaxonomy();
-    };
-    nav.appendChild(btn);
-  });
-}
-
-function renderBlocks() {
-  const grid = document.getElementById("blocks-grid");
-  grid.innerHTML = "";
-
-  const blocks = state.blocks[state.currentType] || [];
-  blocks.sort((a, b) => (b.favorite === true) - (a.favorite === true));
-  const filtered = blocks.filter(b =>
-    b.title.toLowerCase().includes(state.searchQuery) ||
-    b.content.toLowerCase().includes(state.searchQuery)
-  );
-
-  filtered.forEach(b => {
-    const div = document.createElement("div");
-    div.className = "block-card" + (state.selected.has(b.id) ? " selected" : "");
-    div.onclick = () => toggleBlock(b.id);
-    div.oncontextmenu = (e) => {
-  e.preventDefault();
-  editBlock(b.id);
-};
-div.oncontextmenu = (e) => {
-  e.preventDefault();
-
-  if (e.shiftKey) {
-    deleteBlock(b.id);
-  } else {
-    editBlock(b.id);
-  }
-};
-
-   div.innerHTML = `
-  <div class="block-header">
-    <strong>${b.title}</strong>
-    <span
-      class="fav ${b.favorite ? "active" : ""}"
-      title="Marcar como favorito"
-    >★</span>
-  </div>
-  <p>${b.content}</p>
-`;
-
-    div.onclick = () => toggleBlock(b.id);
-    div.querySelector(".fav").onclick = (e) => {
-    e.stopPropagation();
-    toggleFavorite(b.id);
-    };
-    grid.appendChild(div);
-  });
-}
-
-/* ========= HELPERS ========= */
-function findBlock(id) {
-  return Object.values(state.blocks).flat().find(b => b.id === id);
-}
-
-/* ========= STORAGE ========= */
-function saveState() {
-  const serializable = {
-    ...state,
-    selected: [...state.selected] // 🔑 convertir Set → Array
-  };
-  localStorage.setItem("prompt-builder", JSON.stringify(serializable));
-}
-
-function loadState() {
-  const saved = localStorage.getItem("prompt-builder");
-  if (!saved) return;
-
-  const parsed = JSON.parse(saved);
-
-  state.blocks = parsed.blocks || {};
-  state.prompt = parsed.prompt || "";
-  state.relations = parsed.relations || {};
-  state.currentType = parsed.currentType || "Rol / Perfil";
-  state.searchQuery = "";
-
-  // 🔒 PROTECCIÓN TOTAL
-  if (Array.isArray(parsed.selected)) {
-    state.selected = new Set(parsed.selected);
-  } else {
-    state.selected = new Set();
-  }
-
-  state.templates = Array.isArray(parsed.templates)
-    ? parsed.templates
-    : [];
-}
-
-function ensureGitHubToken() {
-  let token = localStorage.getItem("gh-token");
-
-  if (!token) {
-    token = prompt(
-      "Introduce tu GitHub Personal Access Token (scope: gist).\n" +
-      "Se guardará solo en este navegador."
-    );
-
-    if (!token) {
-      alert("Token requerido para continuar");
-      return null;
-    }
-
-    localStorage.setItem("gh-token", token.trim());
-  }
-
-  return token;
-}
-
-
-/* ========= MOCK AI ========= */
-document.getElementById("ai-clean-btn").onclick = () => {
-  document.getElementById("main-prompt").value =
-    state.prompt.replace(/\n{2,}/g, "\n\n").trim();
-};
-
-document.getElementById("deconstruct-btn").onclick = () => {
-  document.getElementById("code-output").value =
-    "Descripción:\nEntidad principal\n\nResponsabilidades:\n- Manejo de estado\n- Validaciones";
-};
-
-document.getElementById("block-search").addEventListener("input", (e) => {
-  state.searchQuery = e.target.value.toLowerCase();
-  renderBlocks();
-});
-
-document.getElementById("save-combination").onclick = () => {
-  if (!state.selected.size) return;
-
-  const name = prompt("Nombre de la plantilla:");
-  if (!name) return;
-
-  state.templates.push({
-    id: crypto.randomUUID(),
-    name,
-    blockIds: [...state.selected],
-    createdAt: Date.now()
-  });
-
-  saveState();
-  renderTemplates();
-  renderTaxonomy();
-};
-
-function renderTemplates() {
-  const container = document.getElementById("templates-list");
-  container.innerHTML = "";
-
-  if (!state.templates || !state.templates.length) {
-    container.innerHTML = `<p class="tip">Aún no hay plantillas guardadas.</p>`;
-    return;
-  }
-
-  state.templates.forEach(t => {
-    const div = document.createElement("div");
-    div.className = "template-item";
-    div.innerText = t.name;
-    div.onclick = () => applyTemplate(t);
-    container.appendChild(div);
-  });
-}
-
-function applyTemplate(template) {
-  state.selected = new Set(template.blockIds);
-  rebuildPrompt();
-  renderBlocks();
-  renderPredictions();
-  saveState();
-  renderTaxonomy();
-}
-/* Exportar*/
-document.getElementById("export-json").onclick = () => {
-  const data = {
-    ...state,
-    selected: [...state.selected]
-  };
-
-  const blob = new Blob([JSON.stringify(data, null, 2)], {
-    type: "application/json"
-  });
-
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "prompt-builder-export.json";
-  a.click();
-};
-/*Importar */
-document.getElementById("import-json").onclick = () => {
-  document.getElementById("import-file").click();
-};
-
-document.getElementById("import-file").onchange = (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      const parsed = JSON.parse(reader.result);
-
-      // 🔒 Validaciones mínimas
-      state.blocks = parsed.blocks || {};
-      state.relations = parsed.relations || {};
-      state.templates = parsed.templates || [];
-      state.selected = new Set(parsed.selected || []);
-      state.prompt = "";
-
-      saveState();
-      renderTaxonomy();
-      renderBlocks();
-      renderPredictions();
-      renderTemplates();
-      rebuildPrompt();
-    } catch {
-      alert("JSON inválido");
-    }
-  };
-  reader.readAsText(file);
-};
-/* limpiar todo */
-document.getElementById("clear-all").onclick = () => {
-  state.selected.clear();
-  rebuildPrompt();
-  renderBlocks();
-  renderPredictions();
-};
-/*Reset total*/
-document.getElementById("reset-app").onclick = () => {
-  if (!confirm("Esto borrará todo. ¿Seguro?")) return;
-  localStorage.removeItem("prompt-builder");
-  location.reload();
-};
-
-/* GIST */
-
-document.getElementById("gist-save").onclick = saveToGist;
-document.getElementById("gist-load").onclick = loadFromGist;
-
-const GIST_API = "https://api.github.com/gists";
-
-function getAuthHeaders() {
-  const token = ensureGitHubToken();
-  if (!token) throw new Error("No GitHub token");
-  return {
-    "Authorization": `Bearer ${token}`,
-    "Accept": "application/vnd.github+json"
-  };
-}
-async function saveToGist() {
-  const gistId = localStorage.getItem("gist-id");
-
-  const payload = {
-    description: "Prompt Builder Backup",
-    public: false,
-    files: {
-      "prompt-builder.json": {
-        content: JSON.stringify(exportState(), null, 2)
-      }
-    }
-  };
-
-  const url = gistId ? `${GIST_API}/${gistId}` : GIST_API;
-  const method = gistId ? "PATCH" : "POST";
-
-  const res = await fetch(url, {
-    method,
-    headers: {
-      ...getAuthHeaders(),
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
-  });
-
-  const data = await res.json();
-
-  if (!gistId) {
-    localStorage.setItem("gist-id", data.id);
-  }
-
-  alert("Backup guardado en Gist ✅");
-}
-/*Restaurar desde Gist */
-async function loadFromGist() {
-  const gistId = localStorage.getItem("gist-id");
-  if (!gistId) return alert("No hay Gist configurado");
-
-  const res = await fetch(`${GIST_API}/${gistId}`, {
-    headers: getAuthHeaders()
-  });
-
-  const data = await res.json();
-  const content = data.files["prompt-builder.json"].content;
-  const parsed = JSON.parse(content);
-
-  importState(parsed);
-  alert("Configuración restaurada ✅");
-}
-/*Funciones */
-function exportState() {
-  return {
-    version: 1,
-    blocks: state.blocks,
-    relations: state.relations,
-    templates: state.templates,
-    selected: [...state.selected],
-    metadata: {
-      updatedAt: Date.now()
-    }
-  };
-}
-
-function importState(parsed) {
-  state.blocks = parsed.blocks || {};
-  state.relations = parsed.relations || {};
-  state.templates = parsed.templates || [];
-  state.selected = new Set(parsed.selected || []);
-  saveState();
-  renderTaxonomy();
-  renderAll();
-}
-/* Guardar nuevos bloques */
-document.getElementById("add-block-btn").onclick = () => {
-  const type = document.getElementById("new-block-group").value;
-  const title = document.getElementById("new-block-title").value.trim();
-  const content = document.getElementById("new-block-content").value.trim();
-
-  if (!title || !content) {
-    alert("Título y contenido son obligatorios");
-    return;
-  }
-if (state.editingBlockId) {
-    updateBlock(state.editingBlockId, type, title, content);
-  }else {
-    addBlock(type, title, content);
-  }
-resetBlockForm();
- 
-};
-
-function updateBlock(id, newType, newTitle, newContent) {
-  const block = findBlock(id);
-  if (!block) return;
-
-  // si cambia de categoría → mover de array
-  if (block.type !== newType) {
-    state.blocks[block.type] =
-      state.blocks[block.type].filter(b => b.id !== id);
-
-    if (!state.blocks[newType]) state.blocks[newType] = [];
-    block.type = newType;
-    state.blocks[newType].push(block);
-  }
-
-  block.title = newTitle;
-  block.content = newContent;
-
-  saveState();
-  renderTaxonomy();
-  rebuildPrompt();
-  renderBlocks();
-  renderPredictions();
-}
-function resetBlockForm() {
-  document.getElementById("new-block-title").value = "";
-  document.getElementById("new-block-content").value = "";
-  state.editingBlockId = null;
-
-  document.getElementById("add-block-btn").innerText = "Guardar Bloque";
-}
-
-function editBlock(id) {
-  const block = findBlock(id);
-  if (!block) return;
-
-  // cargar datos en el formulario
-  document.getElementById("new-block-group").value = block.type;
-  document.getElementById("new-block-title").value = block.title;
-  document.getElementById("new-block-content").value = block.content;
-
-  state.editingBlockId = id;
-
-  // feedback visual
-  document.getElementById("add-block-btn").innerText = "Actualizar Bloque ✏️";
-}
-function insertAtCursor(text) {
-  const textarea = document.getElementById("main-prompt");
-
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-
-  const before = textarea.value.substring(0, start);
-  const after = textarea.value.substring(end);
-
-  const insertion = text.endsWith("\n") ? text : text + "\n\n";
-
-  textarea.value = before + insertion + after;
-
-  // mover cursor al final del texto insertado
-  const newCursorPos = before.length + insertion.length;
-  textarea.selectionStart = textarea.selectionEnd = newCursorPos;
-
-  state.prompt = textarea.value;
-  saveState(); // 🔒 persistencia atómica
-  renderTaxonomy();
-}
-
-function deleteBlock(id) {
-  const block = findBlock(id);
-  if (!block) return;
-
-  if (!confirm(`Eliminar el bloque "${block.title}"?`)) return;
-
-  // eliminar de su categoría
-  state.blocks[block.type] =
-    state.blocks[block.type].filter(b => b.id !== id);
-
-  // limpiar selección
-  state.selected.delete(id);
-
-  // limpiar relaciones
-  delete state.relations[id];
-  Object.values(state.relations).forEach(rel => delete rel[id]);
-
-  saveState();
-  rebuildPrompt();
-  renderBlocks();
-  renderPredictions();
-  renderTaxonomy();
-}
-const helpModal = document.getElementById("help-modal");
-
-document.getElementById("open-help").onclick = () => {
-  helpModal.classList.remove("hidden");
-};
-
-document.getElementById("close-help").onclick = closeHelpModal;
-
-helpModal.querySelector(".modal-overlay").onclick = closeHelpModal;
-
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") closeHelpModal();
-});
-
-function closeHelpModal() {
-  helpModal.classList.add("hidden");
-}
-function getTotalBlocksCount() {
-  return Object.values(state.blocks)
-    .reduce((sum, arr) => sum + arr.length, 0);
-}
-
-function getBlocksCountByType(type) {
-  return (state.blocks[type] || []).length;
-}
-function renderTotalBlocksCount() {
-  document.getElementById("total-blocks-count").innerText =
-    getTotalBlocksCount();
-}
+/* ========= RENDERIZADO UI ========= */
 function renderTaxonomy() {
   const nav = document.getElementById("taxonomy-nav");
   nav.innerHTML = "";
@@ -642,10 +238,489 @@ function renderTaxonomy() {
     btn.onclick = () => {
       state.currentType = type;
       renderBlocks();
-      renderTaxonomy();
+      updateActiveTab();
     };
     nav.appendChild(btn);
   });
 
-  renderTotalBlocksCount();
+  document.getElementById("total-blocks-count").innerText = getTotalBlocksCount();
+}
+
+function updateActiveTab() {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.remove('active');
+    if (btn.textContent.includes(state.currentType)) {
+      btn.classList.add('active');
+    }
+  });
+}
+
+function renderBlocks() {
+  const grid = document.getElementById("blocks-grid");
+  grid.innerHTML = "";
+
+  const blocks = state.blocks[state.currentType] || [];
+  blocks.sort((a, b) => (b.favorite === true) - (a.favorite === true));
+  
+  const filtered = blocks.filter(b =>
+    b.title.toLowerCase().includes(state.searchQuery) ||
+    b.content.toLowerCase().includes(state.searchQuery)
+  );
+
+  filtered.forEach(b => {
+    const div = document.createElement("div");
+    div.className = "block-card" + (state.selected.has(b.id) ? " selected" : "");
+    
+    div.innerHTML = `
+      <div class="block-header">
+        <strong>${b.title}</strong>
+        <span class="fav ${b.favorite ? "active" : ""}" title="Marcar como favorito">★</span>
+      </div>
+      <p>${b.content}</p>
+    `;
+
+    div.onclick = () => toggleBlock(b.id);
+    div.querySelector(".fav").onclick = (e) => {
+      e.stopPropagation();
+      toggleFavorite(b.id);
+    };
+    
+    div.oncontextmenu = (e) => {
+      e.preventDefault();
+      if (e.shiftKey) {
+        deleteBlock(b.id);
+      } else {
+        editBlock(b.id);
+      }
+    };
+
+    grid.appendChild(div);
+  });
+}
+
+function renderTemplates() {
+  const container = document.getElementById("templates-list");
+  container.innerHTML = "";
+
+  if (!state.templates.length) {
+    container.innerHTML = `<p class="tip">Aún no hay plantillas guardadas.</p>`;
+    return;
+  }
+
+  state.templates.forEach(t => {
+    const div = document.createElement("div");
+    div.className = "template-item";
+    div.innerHTML = `
+      <strong>${t.name}</strong>
+      <small>${new Date(t.createdAt).toLocaleDateString()}</small>
+    `;
+    div.onclick = () => applyTemplate(t);
+    container.appendChild(div);
+  });
+}
+
+/* ========= PLANTILLAS ========= */
+function saveTemplate() {
+  if (!state.selected.size) {
+    alert("Selecciona al menos un bloque para guardar como plantilla");
+    return;
+  }
+
+  const name = prompt("Nombre de la plantilla:");
+  if (!name) return;
+
+  state.templates.push({
+    id: crypto.randomUUID(),
+    name,
+    blockIds: [...state.selected],
+    createdAt: Date.now()
+  });
+
+  saveState();
+  renderTemplates();
+  alert(`Plantilla "${name}" guardada ✅`);
+}
+
+function applyTemplate(template) {
+  state.selected = new Set(template.blockIds);
+  rebuildPrompt();
+  renderAll();
+}
+
+/* ========= GESTIÓN GITHUB GIST ========= */
+function getGitHubToken() {
+  let token = localStorage.getItem("github_token");
+  
+  if (!token) {
+    token = prompt(
+      "Introduce tu GitHub Personal Access Token (scope: gist):\n" +
+      "Se guardará solo en este navegador."
+    );
+    
+    if (!token) return null;
+    
+    localStorage.setItem("github_token", token.trim());
+  }
+  
+  return token;
+}
+
+function getAuthHeaders() {
+  const token = getGitHubToken();
+  if (!token) throw new Error("No GitHub token available");
+  
+  return {
+    "Authorization": `Bearer ${token}`,
+    "Accept": "application/vnd.github+json",
+    "Content-Type": "application/json"
+  };
+}
+
+async function saveToGist() {
+  try {
+    const token = getGitHubToken();
+    if (!token) return;
+
+    const gistId = localStorage.getItem("gist_id");
+    const payload = {
+      description: "Prompt Builder Backup - " + new Date().toLocaleString(),
+      public: false,
+      files: {
+        "prompt-builder.json": {
+          content: JSON.stringify(exportState(), null, 2)
+        }
+      }
+    };
+
+    const url = gistId ? `${GIST_API}/${gistId}` : GIST_API;
+    const method = gistId ? "PATCH" : "POST";
+
+    const response = await fetch(url, {
+      method,
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    
+    if (!gistId) {
+      localStorage.setItem("gist_id", data.id);
+      localStorage.setItem("gist_url", data.html_url);
+    }
+
+    alert(`Backup guardado en Gist ✅\nURL: ${data.html_url}`);
+  } catch (error) {
+    alert(`Error al guardar en Gist: ${error.message}`);
+  }
+}
+
+async function loadFromGist() {
+  try {
+    const token = getGitHubToken();
+    if (!token) return;
+
+    const gistId = localStorage.getItem("gist_id");
+    let targetGistId = gistId;
+
+    if (!targetGistId) {
+      targetGistId = prompt(
+        "Introduce el ID del Gist a restaurar:\n" +
+        "(Lo encuentras en la URL del Gist: gist.github.com/USER/ID)"
+      );
+      if (!targetGistId) return;
+    }
+
+    const response = await fetch(`${GIST_API}/${targetGistId}`, {
+      headers: getAuthHeaders()
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const file = data.files["prompt-builder.json"];
+    
+    if (!file) {
+      throw new Error("No se encontró el archivo prompt-builder.json en el Gist");
+    }
+
+    const parsed = JSON.parse(file.content);
+    importState(parsed);
+    
+    if (targetGistId !== gistId) {
+      localStorage.setItem("gist_id", targetGistId);
+      localStorage.setItem("gist_url", data.html_url);
+    }
+
+    alert("Configuración restaurada desde Gist ✅");
+  } catch (error) {
+    alert(`Error al cargar desde Gist: ${error.message}`);
+  }
+}
+
+/* ========= EXPORT/IMPORT ========= */
+function exportState() {
+  return {
+    version: 2,
+    blocks: state.blocks,
+    relations: state.relations,
+    templates: state.templates,
+    selected: [...state.selected],
+    prompt: state.prompt,
+    metadata: {
+      exportedAt: Date.now(),
+      totalBlocks: getTotalBlocksCount()
+    }
+  };
+}
+
+function importState(parsed) {
+  // Normalizar datos antiguos
+  state.blocks = parsed.blocks || {};
+  state.relations = parsed.relations || {};
+  state.templates = parsed.templates || [];
+  state.selected = new Set(parsed.selected || []);
+  state.prompt = parsed.prompt || "";
+  
+  // Migrar de versión 1 a 2 si es necesario
+  if (parsed.version === 1) {
+    // Conversión de datos antiguos
+  }
+  
+  saveState();
+  renderAll();
+}
+
+/* ========= HELPERS ========= */
+function findBlock(id) {
+  for (const type in state.blocks) {
+    const block = state.blocks[type].find(b => b.id === id);
+    if (block) return block;
+  }
+  return null;
+}
+
+function getTotalBlocksCount() {
+  return Object.values(state.blocks).reduce((sum, arr) => sum + arr.length, 0);
+}
+
+function getBlocksCountByType(type) {
+  return (state.blocks[type] || []).length;
+}
+
+function showFileModeWarning() {
+  console.warn("Ejecutando en file:// — localStorage depende de la ruta del archivo");
+  // Podrías mostrar un toast o advertencia en la UI
+}
+
+/* ========= PERSISTENCIA ========= */
+function saveState() {
+  const serializable = {
+    ...state,
+    selected: [...state.selected],
+    version: 2
+  };
+  localStorage.setItem("prompt-builder", JSON.stringify(serializable));
+}
+
+function loadState() {
+  const saved = localStorage.getItem("prompt-builder");
+  if (!saved) return;
+
+  try {
+    const parsed = JSON.parse(saved);
+    
+    // Restaurar estado con normalización
+    state.blocks = parsed.blocks || {};
+    state.relations = parsed.relations || {};
+    state.templates = parsed.templates || [];
+    state.prompt = parsed.prompt || "";
+    state.currentType = parsed.currentType || TAXONOMY[0];
+    
+    // Manejo seguro del Set selected
+    if (Array.isArray(parsed.selected)) {
+      state.selected = new Set(parsed.selected);
+    } else {
+      state.selected = new Set();
+    }
+    
+    // Migración de datos antiguos
+    if (parsed.version === 1) {
+      // Convertir arrays a Sets si es necesario
+    }
+  } catch (error) {
+    console.error("Error loading state:", error);
+    // Estado por defecto
+  }
+}
+
+/* ========= FORMULARIO BLOQUES ========= */
+function editBlock(id) {
+  const block = findBlock(id);
+  if (!block) return;
+
+  document.getElementById("new-block-group").value = block.type;
+  document.getElementById("new-block-title").value = block.title;
+  document.getElementById("new-block-content").value = block.content;
+  state.editingBlockId = id;
+  document.getElementById("add-block-btn").innerText = "Actualizar Bloque ✏️";
+}
+
+function resetBlockForm() {
+  document.getElementById("new-block-title").value = "";
+  document.getElementById("new-block-content").value = "";
+  state.editingBlockId = null;
+  document.getElementById("add-block-btn").innerText = "Guardar Bloque";
+}
+
+/* ========= EVENT LISTENERS ========= */
+function setupEventListeners() {
+  // Búsqueda
+  document.getElementById("block-search").addEventListener("input", (e) => {
+    state.searchQuery = e.target.value.toLowerCase();
+    renderBlocks();
+  });
+
+  // Editor principal
+  const promptTextarea = document.getElementById("main-prompt");
+  promptTextarea.addEventListener("input", () => {
+    state.prompt = promptTextarea.value;
+    saveState();
+  });
+
+  // Botón guardar bloque
+  document.getElementById("add-block-btn").onclick = () => {
+    const type = document.getElementById("new-block-group").value;
+    const title = document.getElementById("new-block-title").value.trim();
+    const content = document.getElementById("new-block-content").value.trim();
+
+    if (!title || !content) {
+      alert("Título y contenido son obligatorios");
+      return;
+    }
+
+    if (state.editingBlockId) {
+      updateBlock(state.editingBlockId, type, title, content);
+    } else {
+      addBlock(type, title, content);
+    }
+    
+    resetBlockForm();
+  };
+
+  // Botones de acción
+  document.getElementById("save-combination").onclick = saveTemplate;
+  document.getElementById("ai-clean-btn").onclick = () => {
+    document.getElementById("main-prompt").value = 
+      state.prompt.replace(/\n{3,}/g, "\n\n").trim();
+  };
+  
+  document.getElementById("deconstruct-btn").onclick = () => {
+    const codeInput = document.getElementById("code-input").value;
+    if (!codeInput.trim()) {
+      alert("Pega algún código primero");
+      return;
+    }
+    document.getElementById("code-output").value = 
+      "Descripción:\nEntidad principal\n\nResponsabilidades:\n- Manejo de estado\n- Validaciones\n- Lógica de negocio";
+  };
+
+  document.getElementById("insert-analysis-btn").onclick = () => {
+    const analysis = document.getElementById("code-output").value;
+    if (analysis) insertAtCursor(analysis);
+  };
+
+  // Export/Import
+  document.getElementById("export-json").onclick = () => {
+    const data = exportState();
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json"
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `prompt-builder-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+  };
+
+  document.getElementById("import-json").onclick = () => {
+    document.getElementById("import-file").click();
+  };
+
+  document.getElementById("import-file").onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        importState(parsed);
+        alert("Configuración importada ✅");
+      } catch {
+        alert("JSON inválido o corrupto");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ""; // Reset input
+  };
+
+  // Gist
+  document.getElementById("gist-save").onclick = saveToGist;
+  document.getElementById("restore-from-gist").onclick = loadFromGist;
+
+  // Limpiar y reset
+  document.getElementById("clear-all").onclick = () => {
+    state.selected.clear();
+    rebuildPrompt();
+    renderAll();
+  };
+
+  document.getElementById("reset-app").onclick = () => {
+    if (confirm("¿Estás seguro? Esto borrará TODOS los datos locales.")) {
+      localStorage.clear();
+      location.reload();
+    }
+  };
+
+  // Modal de ayuda
+  const helpModal = document.getElementById("help-modal");
+  document.getElementById("open-help").onclick = () => {
+    helpModal.classList.remove("hidden");
+  };
+  
+  document.getElementById("close-help").onclick = () => {
+    helpModal.classList.add("hidden");
+  };
+  
+  helpModal.querySelector(".modal-overlay").onclick = () => {
+    helpModal.classList.add("hidden");
+  };
+  
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") helpModal.classList.add("hidden");
+  });
+
+  // Copiar al portapapeles
+  document.getElementById("copy-btn").onclick = () => {
+    const textarea = document.getElementById("main-prompt");
+    textarea.select();
+    document.execCommand("copy");
+    
+    // Feedback visual
+    const originalText = textarea.value;
+    const btn = document.getElementById("copy-btn");
+    const originalBtnText = btn.innerText;
+    btn.innerText = "✓ Copiado!";
+    btn.style.backgroundColor = "#4CAF50";
+    
+    setTimeout(() => {
+      btn.innerText = originalBtnText;
+      btn.style.backgroundColor = "";
+    }, 2000);
+  };
 }

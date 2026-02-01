@@ -12,7 +12,10 @@
         <div class="header-actions">
             <button id="open-help" class="btn btn-outline">❓ Instrucciones</button>
             <button id="gist-save" class="btn btn-outline">☁ Guardar en Gist</button>
-            <button id="gist-load" class="btn btn-outline">⬇ Restaurar</button>
+            <button id="restore-from-gist" class="btn btn-outline">
+                ⬇️ Restaurar desde Gist
+            </button>
+
             <button id="export-json" class="btn btn-outline">⬇ Exportar</button>
             <button id="import-json" class="btn btn-outline">⬆ Importar</button>
             <input type="file" id="import-file" accept="application/json" hidden />
@@ -167,6 +170,26 @@
         El token se guarda solo en tu navegador.
       </p>
     </section>
+
+    <section>
+  <h3>⚠️ Persistencia y archivos locales</h3>
+  <p>
+    Si usas la aplicación abriendo <code>index.html</code> directamente
+    (<code>file://</code>), el almacenamiento depende de la ruta del archivo.
+  </p>
+  <p>
+    Mover la carpeta o abrirla desde otra ubicación puede hacer que la app
+    aparezca vacía.
+  </p>
+  <p>
+    Para evitar pérdida de datos:
+  </p>
+  <ul>
+    <li>Usa un servidor local (<code>localhost</code>)</li>
+    <li>Guarda backups en GitHub Gist</li>
+    <li>Exporta tu configuración en JSON</li>
+  </ul>
+</section>
   </div>
 </div>
 
